@@ -10,14 +10,14 @@ export const metadata: Metadata = { title: "Edit item" };
 
 export default function EditItemPage({ params }: PageProps<"/items/[id]/edit">) {
   return (
-    <>
+    <div className="mx-auto max-w-3xl">
       <PageHeader title="Edit item" />
-      <Card className="p-6">
-        <Suspense fallback={<Skeleton className="h-96" />}>
+      <Card className="p-5 sm:p-8">
+        <Suspense fallback={<Skeleton className="h-[560px]" />}>
           <EditForm params={params} />
         </Suspense>
       </Card>
-    </>
+    </div>
   );
 }
 

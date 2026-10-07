@@ -1,6 +1,8 @@
+import "server-only";
 import mongoose from "mongoose";
+import { env } from "@/lib/env";
 
-const MONGODB_URI = process.env.MONGODB_URI ?? "mongodb://127.0.0.1:27017/interview-prep";
+const MONGODB_URI = env.MONGODB_URI;
 
 // Reuse one connection across hot reloads in dev and across requests in prod.
 const globalForMongoose = globalThis as unknown as {

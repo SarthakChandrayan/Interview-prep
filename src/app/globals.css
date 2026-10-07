@@ -1,24 +1,226 @@
 @import "tailwindcss";
 
+/* Dark mode follows a `.dark` class on <html>, set before first paint by the
+   inline script in the root layout (system preference unless overridden). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #fafafa;
-  --foreground: #18181b;
+  --background: #f7f7f8;
+  --surface: #ffffff;
+  --surface-muted: #f1f1f4;
+  --border: #e4e4e9;
+  --border-strong: #d1d1d8;
+  --foreground: #16161d;
+  --muted: #5e5e6e;
+  --subtle: #8b8b99;
+
+  --accent: #5b4ef0;
+  --accent-hover: #4b3fdb;
+  --accent-foreground: #ffffff;
+  --accent-soft: #eeecfe;
+  --accent-soft-foreground: #4337c9;
+
+  --success: #12805c;
+  --success-soft: #e3f6ee;
+  --warning: #a35a00;
+  --warning-soft: #fdf1df;
+  --danger: #c4283c;
+  --danger-soft: #fdeaec;
+  --info: #0b6bcb;
+  --info-soft: #e5f1fc;
+
+  --ring: color-mix(in oklab, var(--accent) 45%, transparent);
+  --shadow-color: 240 10% 20%;
+  color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #09090b;
-    --foreground: #f4f4f5;
-  }
+.dark {
+  --background: #0c0c10;
+  --surface: #14141a;
+  --surface-muted: #1c1c24;
+  --border: #26262f;
+  --border-strong: #34343f;
+  --foreground: #ededf2;
+  --muted: #a1a1b0;
+  --subtle: #70707f;
+
+  --accent: #7c71ff;
+  --accent-hover: #8f86ff;
+  --accent-foreground: #ffffff;
+  --accent-soft: #221f45;
+  --accent-soft-foreground: #b7b0ff;
+
+  --success: #3ccf91;
+  --success-soft: #0f2a20;
+  --warning: #f0a83c;
+  --warning-soft: #2e2210;
+  --danger: #ff6b7d;
+  --danger-soft: #331519;
+  --info: #5aa8ff;
+  --info-soft: #0f2034;
+
+  --shadow-color: 0 0% 0%;
+  color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-foreground: var(--accent-soft-foreground);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-ring: var(--ring);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  --shadow-card: 0 1px 2px hsl(var(--shadow-color) / 0.04), 0 1px 1px hsl(var(--shadow-color) / 0.03);
+  --shadow-pop: 0 10px 30px -10px hsl(var(--shadow-color) / 0.25), 0 2px 6px hsl(var(--shadow-color) / 0.08);
+
+  --animate-fade-in: fade-in 0.25s ease-out both;
+  --animate-blink: blink 1s step-end infinite;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+  }
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--accent-soft-foreground);
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Rendered Markdown (notes, interviewer turns, feedback). */
+@layer components {
+  .prose-app {
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+  }
+  .prose-app > * + * {
+    margin-top: 0.75em;
+  }
+  .prose-app h1,
+  .prose-app h2,
+  .prose-app h3 {
+    font-weight: 600;
+    line-height: 1.3;
+    margin-top: 1.25em;
+  }
+  .prose-app h1 {
+    font-size: 1.15em;
+  }
+  .prose-app h2 {
+    font-size: 1.08em;
+  }
+  .prose-app ul {
+    list-style: disc;
+    padding-left: 1.25em;
+  }
+  .prose-app ol {
+    list-style: decimal;
+    padding-left: 1.25em;
+  }
+  .prose-app li + li {
+    margin-top: 0.25em;
+  }
+  .prose-app a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .prose-app strong {
+    font-weight: 600;
+  }
+  .prose-app code {
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: 0.375rem;
+    padding: 0.1em 0.35em;
+  }
+  .prose-app pre {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: 0.6rem;
+    padding: 0.85em 1em;
+    overflow-x: auto;
+  }
+  .prose-app pre code {
+    background: none;
+    border: 0;
+    padding: 0;
+    font-size: inherit;
+  }
+  .prose-app blockquote {
+    border-left: 3px solid var(--border-strong);
+    padding-left: 0.9em;
+    color: var(--muted);
+  }
+  .prose-app table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+  }
+  .prose-app th,
+  .prose-app td {
+    border: 1px solid var(--border);
+    padding: 0.4em 0.6em;
+    text-align: left;
+  }
 }

@@ -1,125 +1,196 @@
+import { ArrowLeft, ArrowUpRight, MessagesSquare, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { deleteItem, resetItemProgress } from "@/app/actions";
 import { ConfirmButton } from "@/components/confirm-button";
-import { Card, DifficultyLabel, KindBadge, Skeleton, buttonStyles } from "@/components/ui";
+import { Markdown } from "@/components/markdown";
+import { ScoreBadge } from "@/components/score";
+import { Badge, ButtonLink, Card, CardHeader, DifficultyBadge, KindBadge, Skeleton, cn } from "@/components/ui";
+import { isAiEnabled } from "@/lib/ai/client";
 import { getItem, getItemHistory } from "@/lib/data";
-import { formatInterval } from "@/lib/srs";
+import { listInterviewsForItem } from "@/lib/interviews";
+import { formatInterval, type Grade } from "@/lib/srs";
 
 export default function ItemPage({ params }: PageProps<"/items/[id]">) {
   return (
-    <Suspense fallback={<Skeleton className="h-96" />}>
+    <Suspense
+      fallback={
+        <div className="space-y-6">
+          <Skeleton className="h-28" />
+          <Skeleton className="h-72" />
+        </div>
+      }
+    >
       <ItemDetail params={params} />
     </Suspense>
   );
 }
 
-const gradeColor = {
-  again: "text-rose-600 dark:text-rose-400",
-  hard: "text-amber-600 dark:text-amber-400",
-  good: "text-emerald-600 dark:text-emerald-400",
-  easy: "text-sky-600 dark:text-sky-400",
+const gradeTone: Record<Grade, "danger" | "warning" | "success" | "info"> = {
+  again: "danger",
+  hard: "warning",
+  good: "success",
+  easy: "info",
 };
 
 const dateFmt = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "UTC" });
 
 async function ItemDetail({ params }: Pick<PageProps<"/items/[id]">, "params">) {
   const { id } = await params;
-  const [item, history] = await Promise.all([getItem(id), getItemHistory(id)]);
+  const [item, history, interviews] = await Promise.all([getItem(id), getItemHistory(id), listInterviewsForItem(id)]);
   if (!item) notFound();
 
   const { srs } = item;
+  const due = srs.dueAt <= new Date();
+  const ai = isAiEnabled();
 
   return (
-    <div className="space-y-6">
+    <div className="animate-fade-in space-y-6">
       <div>
-        <Link href="/items" className="text-sm text-zinc-500 hover:underline">
-          ← Library
+        <Link href="/items" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground">
+          <ArrowLeft className="size-4" />
+          Library
         </Link>
-        <div className="mt-3 flex items-center gap-3">
-          <KindBadge kind={item.kind} />
-          <span className="text-sm text-zinc-500">{item.topic}</span>
-          <DifficultyLabel difficulty={item.difficulty} />
-        </div>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">{item.title}</h1>
-        {item.url && (
-          <a href={item.url} target="_blank" rel="noreferrer" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
-            {item.url} ↗
-          </a>
-        )}
-        {item.tags.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {item.tags.map((t) => (
-              <Link
-                key={t}
-                href={`/items?q=${encodeURIComponent(t)}`}
-                className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400"
+        <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <KindBadge kind={item.kind} />
+              <DifficultyBadge difficulty={item.difficulty} />
+              <span className="text-sm text-muted">{item.topic}</span>
+            </div>
+            <h1 className="mt-2 text-balance text-2xl font-semibold tracking-tight sm:text-[28px]">{item.title}</h1>
+            {item.url && (
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 inline-flex max-w-full items-center gap-1 truncate text-sm text-accent hover:underline"
               >
-                #{t}
-              </Link>
-            ))}
+                {item.url.replace(/^https?:\/\//, "")}
+                <ArrowUpRight className="size-3.5 shrink-0" />
+              </a>
+            )}
+            {item.tags.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {item.tags.map((t) => (
+                  <Link key={t} href={`/items?q=${encodeURIComponent(t)}`}>
+                    <Badge className="hover:text-foreground">#{t}</Badge>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+          <div className="flex flex-wrap gap-2">
+            {ai && (
+              <ButtonLink href={`/interview?item=${item.id}`}>
+                <MessagesSquare />
+                Practise with AI
+              </ButtonLink>
+            )}
+            <ButtonLink href={`/items/${item.id}/edit`} variant="secondary">
+              <Pencil />
+              Edit
+            </ButtonLink>
+          </div>
+        </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card className="md:col-span-2">
-          <h2 className="mb-3 font-semibold">Notes</h2>
-          {item.notes ? (
-            <p className="whitespace-pre-wrap font-mono text-sm leading-relaxed">{item.notes}</p>
-          ) : (
-            <p className="text-sm text-zinc-500">No notes yet.</p>
-          )}
+      <div className="grid items-start gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader title="Notes" />
+          <div className="px-5 pb-6 pt-3 sm:px-6">
+            {item.notes ? (
+              <Markdown>{item.notes}</Markdown>
+            ) : (
+              <p className="text-sm text-muted">
+                No notes yet.{" "}
+                <Link href={`/items/${item.id}/edit`} className="font-medium text-accent hover:underline">
+                  Add the answer you want to remember.
+                </Link>
+              </p>
+            )}
+          </div>
         </Card>
 
+        <div className="space-y-6">
+          <Card>
+            <CardHeader title="Memory" />
+            <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-b-2xl px-5 pb-5 pt-3 sm:px-6">
+              <Stat label="Next review" value={due ? "Due now" : dateFmt.format(srs.dueAt)} highlight={due} />
+              <Stat label="Interval" value={srs.interval ? formatInterval(srs.interval) : "New"} />
+              <Stat label="Ease" value={srs.ease.toFixed(2)} />
+              <Stat label="Streak" value={String(srs.reps)} />
+              <Stat label="Lapses" value={String(srs.lapses)} />
+              <Stat label="Reviews" value={String(history.length)} />
+            </dl>
+          </Card>
+
+          <Card>
+            <CardHeader title="Review history" />
+            <div className="px-5 pb-5 pt-3 sm:px-6">
+              {history.length === 0 ? (
+                <p className="text-sm text-muted">Not reviewed yet.</p>
+              ) : (
+                <ol className="space-y-2.5">
+                  {history.slice(0, 12).map((r) => (
+                    <li key={r.id} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="text-muted">{dateFmt.format(r.reviewedAt)}</span>
+                      <span className="flex items-center gap-2">
+                        <Badge tone={gradeTone[r.grade]} className="capitalize">
+                          {r.grade}
+                        </Badge>
+                        <span className="w-16 text-right text-xs tabular-nums text-subtle">
+                          → {formatInterval(r.intervalAfter)}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      {interviews.length > 0 && (
         <Card>
-          <h2 className="mb-3 font-semibold">Memory</h2>
-          <dl className="space-y-2 text-sm">
-            <Row label="Next review" value={dateFmt.format(srs.dueAt)} />
-            <Row label="Interval" value={srs.interval ? formatInterval(srs.interval) : "New"} />
-            <Row label="Ease" value={srs.ease.toFixed(2)} />
-            <Row label="Streak" value={String(srs.reps)} />
-            <Row label="Lapses" value={String(srs.lapses)} />
-          </dl>
-        </Card>
-      </div>
-
-      <Card>
-        <h2 className="mb-3 font-semibold">Review history</h2>
-        {history.length === 0 ? (
-          <p className="text-sm text-zinc-500">Not reviewed yet.</p>
-        ) : (
-          <ul className="space-y-1 text-sm">
-            {history.map((r) => (
-              <li key={r.id} className="flex justify-between">
-                <span className="text-zinc-500">{dateFmt.format(r.reviewedAt)}</span>
-                <span>
-                  <span className={`font-medium capitalize ${gradeColor[r.grade]}`}>{r.grade}</span>
-                  <span className="text-zinc-500"> → {formatInterval(r.intervalAfter)}</span>
-                </span>
+          <CardHeader title="Mock interviews" description="Your AI practice sessions on this question" />
+          <ul className="divide-y divide-border px-2 pb-2 pt-2">
+            {interviews.map((iv) => (
+              <li key={iv.id}>
+                <Link
+                  href={`/interview/${iv.id}`}
+                  className="flex items-center justify-between rounded-lg px-3 py-3 text-sm hover:bg-surface-muted/60"
+                >
+                  <span className="text-muted">{dateFmt.format(iv.createdAt)}</span>
+                  {iv.feedback ? <ScoreBadge score={iv.feedback.overall_score} /> : <Badge>In progress</Badge>}
+                </Link>
               </li>
             ))}
           </ul>
-        )}
-      </Card>
+        </Card>
+      )}
 
-      <div className="flex flex-wrap gap-3">
-        <Link href={`/items/${item.id}/edit`} className={buttonStyles.primary}>
-          Edit
-        </Link>
+      <div className="flex flex-wrap gap-2 border-t border-border pt-6">
         <ConfirmButton
           action={resetItemProgress.bind(null, item.id)}
-          message="Reset this item's review progress and history?"
-          className={buttonStyles.secondary}
+          title="Reset progress?"
+          description="This clears the review history and schedules the item as new. Your notes are kept."
+          confirmLabel="Reset progress"
+          successMessage="Progress reset"
         >
+          <RotateCcw />
           Reset progress
         </ConfirmButton>
         <ConfirmButton
           action={deleteItem.bind(null, item.id)}
-          message="Delete this item permanently?"
-          className={buttonStyles.danger}
+          title="Delete this item?"
+          description="The item and its review history are permanently deleted. This can't be undone."
+          confirmLabel="Delete"
+          variant="danger"
         >
+          <Trash2 />
           Delete
         </ConfirmButton>
       </div>
@@ -127,11 +198,11 @@ async function ItemDetail({ params }: Pick<PageProps<"/items/[id]">, "params">) 
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className="flex justify-between">
-      <dt className="text-zinc-500">{label}</dt>
-      <dd className="tabular-nums">{value}</dd>
+    <div className="py-2">
+      <dt className="text-xs text-subtle">{label}</dt>
+      <dd className={cn("mt-0.5 text-sm font-medium tabular-nums", highlight && "text-accent")}>{value}</dd>
     </div>
   );
 }

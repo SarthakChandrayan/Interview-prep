@@ -1,17 +1,21 @@
 "use client";
 
-import { buttonStyles } from "@/components/ui";
+import { TriangleAlert } from "lucide-react";
+import { Button, Card, EmptyState } from "@/components/ui";
 
-export default function Error({ reset }: { error: Error; reset: () => void }) {
+export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
-    <div className="py-20 text-center">
-      <h1 className="text-2xl font-semibold">Something went wrong</h1>
-      <p className="mt-2 text-sm text-zinc-500">
-        If this keeps happening, check that MongoDB is running and <code>MONGODB_URI</code> is set.
-      </p>
-      <button onClick={reset} className={`${buttonStyles.secondary} mt-6`}>
-        Try again
-      </button>
-    </div>
+    <Card className="mx-auto mt-8 max-w-xl">
+      <EmptyState
+        icon={<TriangleAlert />}
+        title="Something went wrong"
+        description="This page failed to load. If it keeps happening, check that the database is reachable (MONGODB_URI)."
+      >
+        <Button variant="secondary" onClick={reset}>
+          Try again
+        </Button>
+      </EmptyState>
+      {error.digest && <p className="pb-6 text-center font-mono text-xs text-subtle">Error ID: {error.digest}</p>}
+    </Card>
   );
 }

@@ -4,7 +4,8 @@ import { isValidObjectId } from "mongoose";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { connectDb } from "@/lib/db";
-import { GRADES, initialSrs, schedule, type Grade, type SrsState } from "@/lib/srs";
+import { recordReview } from "@/lib/reviews";
+import { initialSrs, type Grade } from "@/lib/srs";
 import { parseItemForm } from "@/lib/validation";
 import { Item } from "@/models/Item";
 import { Review } from "@/models/Review";
@@ -76,20 +77,7 @@ export async function resetItemProgress(id: string) {
 }
 
 export async function reviewItem(id: string, grade: Grade) {
-  if (!isValidObjectId(id) || !GRADES.includes(grade)) throw new Error("Invalid review");
-
-  await connectDb();
-  const item = await Item.findById(id);
-  if (!item) throw new Error("Item not found");
-
-  const now = new Date();
-  const next = schedule(item.srs as unknown as SrsState, grade, now);
-  item.set("srs", next);
-  await Promise.all([
-    item.save(),
-    Review.create({ item: item._id, grade, intervalAfter: next.interval, reviewedAt: now }),
-  ]);
-
+  if (!(await recordReview(id, grade))) throw new Error("Item not found");
   revalidatePath("/", "layout");
 }
 

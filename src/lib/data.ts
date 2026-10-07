@@ -6,6 +6,7 @@ import { currentStreak, dayKey, lastNDays } from "@/lib/stats";
 import type { Grade, SrsState } from "@/lib/srs";
 import type { Difficulty, Kind } from "@/lib/constants";
 import { Item, type ItemDoc } from "@/models/Item";
+import { Interview } from "@/models/Interview";
 import { Review } from "@/models/Review";
 
 export interface PlainItem {
@@ -117,10 +118,11 @@ export interface TopicStat {
 export async function getDashboard() {
   await ready();
   const now = new Date();
-  const days = lastNDays(84, now);
+  // A full year of activity, ending today, for the heatmap.
+  const days = lastNDays(364, now);
   const since = new Date(`${days[0]}T00:00:00Z`);
 
-  const [totalItems, dueNow, byKind, topics, activity] = await Promise.all([
+  const [totalItems, dueNow, byKind, topics, activity, interviewStats] = await Promise.all([
     Item.countDocuments(),
     Item.countDocuments({ "srs.dueAt": { $lte: now } }),
     Item.aggregate<{ _id: Kind; count: number }>([{ $group: { _id: "$kind", count: { $sum: 1 } } }]),
@@ -147,6 +149,16 @@ export async function getDashboard() {
         },
       },
     ]),
+    Interview.aggregate<{ count: number; completed: number; avgScore: number | null }>([
+      {
+        $group: {
+          _id: null,
+          count: { $sum: 1 },
+          completed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
+          avgScore: { $avg: "$feedback.overall_score" },
+        },
+      },
+    ]),
   ]);
 
   const perDay = new Map(activity.map((a) => [a._id, a.count]));
@@ -159,5 +171,15 @@ export async function getDashboard() {
     reviewsToday: perDay.get(dayKey(now)) ?? 0,
     streak: currentStreak(perDay.keys(), now),
     activity: days.map((day) => ({ day, count: perDay.get(day) ?? 0 })),
+    interviews: {
+      count: interviewStats[0]?.count ?? 0,
+      completed: interviewStats[0]?.completed ?? 0,
+      avgScore: interviewStats[0]?.avgScore ?? null,
+    },
   };
+}
+
+export async function getDueCount(): Promise<number> {
+  await ready();
+  return Item.countDocuments({ "srs.dueAt": { $lte: new Date() } });
 }

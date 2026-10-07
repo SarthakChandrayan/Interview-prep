@@ -12,11 +12,18 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "geist": "^1.7.2",
+    "lucide-react": "^1.52.0",
     "mongoose": "^9.11.1",
     "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "react-markdown": "^10.1.0",
+    "remark-breaks": "^4.0.0",
+    "remark-gfm": "^4.0.1",
     "server-only": "^0.0.1",
+    "sonner": "^2.0.8",
     "zod": "^4.6.5"
   },
   "devDependencies": {
