@@ -1,4 +1,4 @@
-import { BookMarked, Layers, LayoutDashboard, MessagesSquare, Plus, Sparkles } from "lucide-react";
+import { BookMarked, Layers, LayoutDashboard, MessagesSquare, Plus } from "lucide-react";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense, type ReactNode } from "react";
@@ -7,6 +7,7 @@ import { getDueCount } from "@/lib/data";
 import { ThemeToggle } from "../theme";
 import { ButtonLink } from "../ui";
 import { MobileNav } from "./mobile-nav";
+import { AccountMenu } from "./account-menu";
 import { ActiveNavList, NavList, type NavItem } from "./nav-list";
 
 function Brand() {
@@ -73,17 +74,13 @@ function SidebarContent() {
         </Suspense>
       </nav>
       <div className="mt-auto space-y-2">
-        <div className="mx-1 rounded-xl border border-border bg-surface-muted/60 p-3 text-xs text-muted">
-          <p className="flex items-center gap-1.5 font-medium text-foreground">
-            <Sparkles className="size-3.5 text-accent" />
-            Tip
-          </p>
-          <p className="mt-1 leading-relaxed">Review a little every day. Ten minutes beats a weekend cram.</p>
-        </div>
         <Suspense>
           <AiStatus />
         </Suspense>
         <ThemeToggle className="mx-1" />
+        <Suspense fallback={<div className="h-[54px] rounded-xl border border-border" />}>
+          <AccountMenu />
+        </Suspense>
       </div>
     </div>
   );

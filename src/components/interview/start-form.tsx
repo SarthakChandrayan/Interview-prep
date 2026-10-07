@@ -2,7 +2,7 @@
 
 import { AlertCircle, Mic, Play, Shuffle } from "lucide-react";
 import { useActionState } from "react";
-import { startInterview } from "@/app/interview/actions";
+import { startInterview } from "@/actions/interview";
 import type { Kind } from "@/lib/constants";
 import { SubmitButton } from "../submit-button";
 import { fieldClass } from "../ui";

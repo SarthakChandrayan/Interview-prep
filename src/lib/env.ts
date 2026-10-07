@@ -8,7 +8,7 @@ const schema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_MODEL: z.string().min(1).default("claude-sonnet-5-5"),
   AI_DAILY_LIMIT: z.coerce.number().int().positive().default(300),
-  AI_PER_CLIENT_DAILY_LIMIT: z.coerce.number().int().positive().default(60),
+  AI_PER_USER_DAILY_LIMIT: z.coerce.number().int().positive().default(60),
 });
 
 const parsed = schema.safeParse(process.env);

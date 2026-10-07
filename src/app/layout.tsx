@@ -1,7 +1,6 @@
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import type { Metadata, Viewport } from "next";
-import { AppShell } from "@/components/shell/app-shell";
 import { themeScript } from "@/components/theme";
 import { Toaster } from "@/components/toaster";
 import "./globals.css";
@@ -33,7 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="min-h-dvh">
-        <AppShell>{children}</AppShell>
+        {children}
         <Toaster />
       </body>
     </html>

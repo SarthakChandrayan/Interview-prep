@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { updateItem } from "@/app/actions";
+import { updateItem } from "@/actions/items";
 import { ItemForm } from "@/components/item-form";
 import { Card, PageHeader, Skeleton } from "@/components/ui";
 import { getItem, listTopics } from "@/lib/data";

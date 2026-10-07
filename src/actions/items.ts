@@ -3,6 +3,7 @@
 import { isValidObjectId } from "mongoose";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { requireUser } from "@/lib/auth/session";
 import { connectDb } from "@/lib/db";
 import { recordReview } from "@/lib/reviews";
 import { initialSrs, type Grade } from "@/lib/srs";
@@ -30,12 +31,16 @@ function formErrors(formData: FormData): FormState | { data: NonNullable<ReturnT
   return { errors, values };
 }
 
+// Server Actions are public HTTP endpoints: every one re-checks the session and
+// only touches documents owned by the signed-in user.
+
 export async function createItem(_prev: FormState, formData: FormData): Promise<FormState> {
+  const user = await requireUser();
   const result = formErrors(formData);
   if (!("data" in result)) return result;
 
   await connectDb();
-  const item = await Item.create({ ...result.data, srs: initialSrs() });
+  const item = await Item.create({ ...result.data, user: user.id, srs: initialSrs() });
 
   revalidatePath("/", "layout");
   if (formData.get("intent") === "another") {
@@ -46,12 +51,13 @@ export async function createItem(_prev: FormState, formData: FormData): Promise<
 }
 
 export async function updateItem(id: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const user = await requireUser();
   if (!isValidObjectId(id)) return { errors: { form: "Item not found" } };
   const result = formErrors(formData);
   if (!("data" in result)) return result;
 
   await connectDb();
-  const updated = await Item.findByIdAndUpdate(id, result.data);
+  const updated = await Item.findOneAndUpdate({ _id: id, user: user.id }, result.data);
   if (!updated) return { errors: { form: "Item not found" } };
 
   revalidatePath("/", "layout");
@@ -59,35 +65,38 @@ export async function updateItem(id: string, _prev: FormState, formData: FormDat
 }
 
 export async function deleteItem(id: string) {
+  const user = await requireUser();
   if (!isValidObjectId(id)) return;
   await connectDb();
-  await Promise.all([Item.findByIdAndDelete(id), Review.deleteMany({ item: id })]);
+  const deleted = await Item.findOneAndDelete({ _id: id, user: user.id });
+  if (deleted) await Review.deleteMany({ item: id, user: user.id });
   revalidatePath("/", "layout");
   redirect("/items");
 }
 
 export async function resetItemProgress(id: string) {
+  const user = await requireUser();
   if (!isValidObjectId(id)) return;
   await connectDb();
-  await Promise.all([
-    Item.findByIdAndUpdate(id, { srs: initialSrs() }),
-    Review.deleteMany({ item: id }),
-  ]);
+  const updated = await Item.findOneAndUpdate({ _id: id, user: user.id }, { srs: initialSrs() });
+  if (updated) await Review.deleteMany({ item: id, user: user.id });
   revalidatePath("/", "layout");
 }
 
 export async function reviewItem(id: string, grade: Grade) {
-  if (!(await recordReview(id, grade))) throw new Error("Item not found");
+  const user = await requireUser();
+  if (!(await recordReview(user.id, id, grade))) throw new Error("Item not found");
   revalidatePath("/", "layout");
 }
 
 export async function importStarterPack() {
+  const user = await requireUser();
   const { STARTER_PACK } = await import("@/lib/starter-pack");
   await connectDb();
-  const existing = new Set(await Item.distinct("title"));
+  const existing = new Set(await Item.distinct("title", { user: user.id }));
   const fresh = STARTER_PACK.filter((s) => !existing.has(s.title));
   if (fresh.length) {
-    await Item.insertMany(fresh.map((s) => ({ ...s, srs: initialSrs() })));
+    await Item.insertMany(fresh.map((s) => ({ ...s, user: user.id, srs: initialSrs() })));
   }
   revalidatePath("/", "layout");
 }

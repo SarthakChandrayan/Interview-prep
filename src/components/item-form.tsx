@@ -2,7 +2,7 @@
 
 import { AlertCircle } from "lucide-react";
 import { useActionState, useId, type ReactNode } from "react";
-import type { FormState } from "@/app/actions";
+import type { FormState } from "@/actions/items";
 import { DIFFICULTIES, KINDS } from "@/lib/constants";
 import { SubmitButton } from "./submit-button";
 import { fieldClass, inputClass, cn } from "./ui";

@@ -2,7 +2,7 @@ import { ArrowLeft, ArrowUpRight, Lightbulb, RotateCcw, Trash2 } from "lucide-re
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { deleteInterview, practiseAgain } from "@/app/interview/actions";
+import { deleteInterview, practiseAgain } from "@/actions/interview";
 import { ConfirmButton } from "@/components/confirm-button";
 import { ApplyGrade } from "@/components/interview/apply-grade";
 import { FeedbackReport } from "@/components/interview/feedback-report";

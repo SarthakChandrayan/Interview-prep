@@ -1,12 +1,11 @@
 "use server";
 
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
-import { isValidObjectId } from "mongoose";
+import { Types, isValidObjectId } from "mongoose";
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { AI_MODEL, describeAiError, fallbackParams, getClient, isAiEnabled } from "@/lib/ai/client";
-import { RateLimitedError, clientKeyFrom, consumeAiQuota } from "@/lib/ai/limits";
+import { RateLimitedError, consumeAiQuota } from "@/lib/ai/limits";
 import {
   FEEDBACK_SYSTEM_PROMPT,
   buildFeedbackRequest,
@@ -15,6 +14,7 @@ import {
   normaliseFeedback,
   type InterviewSubject,
 } from "@/lib/ai/prompts";
+import { requireUser } from "@/lib/auth/session";
 import { connectDb } from "@/lib/db";
 import { toPlainInterview } from "@/lib/interviews";
 import { recordReview } from "@/lib/reviews";
@@ -27,21 +27,25 @@ export interface ActionResult {
 }
 
 /** Pick what to practise: the requested item, else something due, else the weakest item. */
-async function chooseItem(itemId: string | null) {
+async function chooseItem(userId: string, itemId: string | null) {
   if (itemId && isValidObjectId(itemId)) {
-    const item = await Item.findById(itemId).lean();
+    const item = await Item.findOne({ _id: itemId, user: userId }).lean();
     if (item) return item;
   }
-  const [due] = await Item.aggregate([{ $match: { "srs.dueAt": { $lte: new Date() } } }, { $sample: { size: 1 } }]);
+  const [due] = await Item.aggregate([
+    { $match: { user: new Types.ObjectId(userId), "srs.dueAt": { $lte: new Date() } } },
+    { $sample: { size: 1 } },
+  ]);
   if (due) return due;
-  return Item.findOne().sort({ "srs.ease": 1, "srs.lapses": -1 }).lean();
+  return Item.findOne({ user: userId }).sort({ "srs.ease": 1, "srs.lapses": -1 }).lean();
 }
 
 export async function startInterview(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const user = await requireUser();
   if (!isAiEnabled()) return { error: "AI features are turned off: set ANTHROPIC_API_KEY to enable them." };
 
   await connectDb();
-  const item = await chooseItem((formData.get("itemId") as string | null) || null);
+  const item = await chooseItem(user.id, (formData.get("itemId") as string | null) || null);
   if (!item) return { error: "Add some items to your library first." };
 
   const subject: InterviewSubject = {
@@ -52,6 +56,7 @@ export async function startInterview(_prev: ActionResult, formData: FormData): P
     notes: item.notes ?? "",
   };
   const interview = await Interview.create({
+    user: user.id,
     item: item._id,
     subject,
     model: AI_MODEL,
@@ -70,9 +75,10 @@ export async function practiseAgain(formData: FormData) {
 }
 
 export async function finishInterview(id: string): Promise<ActionResult> {
+  const user = await requireUser();
   if (!isValidObjectId(id)) return { error: "Interview not found" };
   await connectDb();
-  const doc = await Interview.findById(id).lean();
+  const doc = await Interview.findOne({ _id: id, user: user.id }).lean();
   if (!doc) return { error: "Interview not found" };
   if (doc.status === "completed") return {};
 
@@ -80,7 +86,7 @@ export async function finishInterview(id: string): Promise<ActionResult> {
   if (interview.answerCount === 0) return { error: "Answer at least one question before ending." };
 
   try {
-    await consumeAiQuota(clientKeyFrom(await headers()));
+    await consumeAiQuota(user.id);
     const response = await getClient().beta.messages.parse({
       model: doc.model,
       max_tokens: 16000,
@@ -118,12 +124,13 @@ export async function finishInterview(id: string): Promise<ActionResult> {
 
 /** Feed the interview result back into spaced repetition. */
 export async function applyInterviewGrade(id: string, grade: Grade): Promise<ActionResult> {
+  const user = await requireUser();
   if (!isValidObjectId(id) || !GRADES.includes(grade)) return { error: "Invalid grade" };
   await connectDb();
-  const interview = await Interview.findById(id, { item: 1, appliedGrade: 1, status: 1 }).lean();
+  const interview = await Interview.findOne({ _id: id, user: user.id }, { item: 1, appliedGrade: 1, status: 1 }).lean();
   if (!interview || interview.status !== "completed") return { error: "Finish the interview first." };
   if (interview.appliedGrade) return {};
-  if (!interview.item || !(await recordReview(String(interview.item), grade))) {
+  if (!interview.item || !(await recordReview(user.id, String(interview.item), grade))) {
     return { error: "The library item for this interview no longer exists." };
   }
   await Interview.updateOne({ _id: id }, { appliedGrade: grade });
@@ -132,9 +139,10 @@ export async function applyInterviewGrade(id: string, grade: Grade): Promise<Act
 }
 
 export async function deleteInterview(id: string) {
+  const user = await requireUser();
   if (!isValidObjectId(id)) return;
   await connectDb();
-  await Interview.deleteOne({ _id: id });
+  await Interview.deleteOne({ _id: id, user: user.id });
   revalidatePath("/interview");
   redirect("/interview");
 }

@@ -4,7 +4,7 @@ import { ArrowUp, Bot, CircleStop, Flag, Loader2, Mic, RotateCw, User } from "lu
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { finishInterview } from "@/app/interview/actions";
+import { finishInterview } from "@/actions/interview";
 import { MAX_ANSWERS, MAX_ANSWER_CHARS, WRAP_UP_AFTER } from "@/lib/ai/constants";
 import type { InterviewMessage } from "@/lib/interviews";
 import { Markdown } from "../markdown";

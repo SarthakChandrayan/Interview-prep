@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { createItem } from "@/app/actions";
+import { createItem } from "@/actions/items";
 import { ItemForm } from "@/components/item-form";
 import { Card, PageHeader, Skeleton } from "@/components/ui";
 import { listTopics } from "@/lib/data";

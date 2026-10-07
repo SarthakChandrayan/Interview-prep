@@ -32,6 +32,7 @@ const feedbackSchema = new Schema(
 
 const interviewSchema = new Schema(
   {
+    user: { type: Schema.Types.ObjectId, ref: "User", required: true },
     item: { type: Schema.Types.ObjectId, ref: "Item", default: null, index: true },
     // Snapshot of the question, so editing or deleting the item later doesn't
     // change a past interview (or the frozen system prompt).
@@ -45,7 +46,7 @@ const interviewSchema = new Schema(
     model: { type: String, required: true },
     system: { type: String, required: true },
     messages: { type: [messageSchema], default: [] },
-    status: { type: String, enum: ["active", "completed"], default: "active", index: true },
+    status: { type: String, enum: ["active", "completed"], default: "active" },
     feedback: { type: feedbackSchema, default: null },
     appliedGrade: { type: String, enum: [...GRADES, null], default: null },
     usage: {
@@ -58,7 +59,7 @@ const interviewSchema = new Schema(
   { timestamps: true },
 );
 
-interviewSchema.index({ createdAt: -1 });
+interviewSchema.index({ user: 1, createdAt: -1 });
 
 export type InterviewDoc = InferSchemaType<typeof interviewSchema>;
 

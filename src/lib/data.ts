@@ -1,6 +1,6 @@
 import "server-only";
-import { isValidObjectId } from "mongoose";
-import { connection } from "next/server";
+import { Types, isValidObjectId } from "mongoose";
+import { requireUser } from "@/lib/auth/session";
 import { connectDb } from "@/lib/db";
 import { currentStreak, dayKey, lastNDays } from "@/lib/stats";
 import type { Grade, SrsState } from "@/lib/srs";
@@ -46,11 +46,14 @@ function toPlain(doc: ItemDoc & { _id: unknown }): PlainItem {
   };
 }
 
-// Every read goes through here: it marks the render as request-time (data
-// changes constantly) and makes sure Mongo is connected.
-async function ready() {
-  await connection();
+// Every read goes through here. It resolves the signed-in user (redirecting
+// to /login if there isn't one), which also makes the render request-time,
+// and every query below filters on the returned owner, so one user can never
+// read another's data.
+async function owner() {
+  const user = await requireUser();
   await connectDb();
+  return { user: user.id, oid: new Types.ObjectId(user.id) };
 }
 
 export interface ItemFilters {
@@ -60,8 +63,8 @@ export interface ItemFilters {
 }
 
 export async function listItems(filters: ItemFilters = {}): Promise<PlainItem[]> {
-  await ready();
-  const query: Record<string, unknown> = {};
+  const { user } = await owner();
+  const query: Record<string, unknown> = { user };
   if (filters.kind) query.kind = filters.kind;
   if (filters.topic) query.topic = filters.topic;
   if (filters.q) {
@@ -73,22 +76,22 @@ export async function listItems(filters: ItemFilters = {}): Promise<PlainItem[]>
 }
 
 export async function listTopics(): Promise<string[]> {
-  await ready();
-  const topics = await Item.distinct("topic");
+  const { user } = await owner();
+  const topics = await Item.distinct("topic", { user });
   return topics.sort((a, b) => a.localeCompare(b));
 }
 
 export async function getItem(id: string): Promise<PlainItem | null> {
-  await ready();
+  const { user } = await owner();
   if (!isValidObjectId(id)) return null;
-  const doc = await Item.findById(id).lean();
+  const doc = await Item.findOne({ _id: id, user }).lean();
   return doc ? toPlain(doc) : null;
 }
 
 export async function getItemHistory(id: string) {
-  await ready();
+  const { user } = await owner();
   if (!isValidObjectId(id)) return [];
-  const docs = await Review.find({ item: id }).sort({ reviewedAt: -1 }).limit(50).lean();
+  const docs = await Review.find({ item: id, user }).sort({ reviewedAt: -1 }).limit(50).lean();
   return docs.map((r) => ({
     id: String(r._id),
     grade: r.grade as Grade,
@@ -98,11 +101,12 @@ export async function getItemHistory(id: string) {
 }
 
 export async function getReviewQueue(limit = 50) {
-  await ready();
+  const { user } = await owner();
   const now = new Date();
+  const due = { user, "srs.dueAt": { $lte: now } };
   const [items, total] = await Promise.all([
-    Item.find({ "srs.dueAt": { $lte: now } }).sort({ "srs.dueAt": 1 }).limit(limit).lean(),
-    Item.countDocuments({ "srs.dueAt": { $lte: now } }),
+    Item.find(due).sort({ "srs.dueAt": 1 }).limit(limit).lean(),
+    Item.countDocuments(due),
   ]);
   return { items: items.map(toPlain), total };
 }
@@ -116,18 +120,23 @@ export interface TopicStat {
 }
 
 export async function getDashboard() {
-  await ready();
+  const { user, oid } = await owner();
   const now = new Date();
   // A full year of activity, ending today, for the heatmap.
   const days = lastNDays(364, now);
   const since = new Date(`${days[0]}T00:00:00Z`);
 
   const [totalItems, dueNow, byKind, topics, activity, interviewStats] = await Promise.all([
-    Item.countDocuments(),
-    Item.countDocuments({ "srs.dueAt": { $lte: now } }),
-    Item.aggregate<{ _id: Kind; count: number }>([{ $group: { _id: "$kind", count: { $sum: 1 } } }]),
+    Item.countDocuments({ user }),
+    Item.countDocuments({ user, "srs.dueAt": { $lte: now } }),
+    // Aggregations don't cast types, so these match on the ObjectId.
+    Item.aggregate<{ _id: Kind; count: number }>([
+      { $match: { user: oid } },
+      { $group: { _id: "$kind", count: { $sum: 1 } } },
+    ]),
     // Lowest average ease first: the topics you keep getting wrong.
     Item.aggregate<TopicStat>([
+      { $match: { user: oid } },
       {
         $group: {
           _id: "$topic",
@@ -141,7 +150,7 @@ export async function getDashboard() {
       { $sort: { avgEase: 1, lapses: -1 } },
     ]),
     Review.aggregate<{ _id: string; count: number }>([
-      { $match: { reviewedAt: { $gte: since } } },
+      { $match: { user: oid, reviewedAt: { $gte: since } } },
       {
         $group: {
           _id: { $dateToString: { format: "%Y-%m-%d", date: "$reviewedAt" } },
@@ -150,6 +159,7 @@ export async function getDashboard() {
       },
     ]),
     Interview.aggregate<{ count: number; completed: number; avgScore: number | null }>([
+      { $match: { user: oid } },
       {
         $group: {
           _id: null,
@@ -180,6 +190,6 @@ export async function getDashboard() {
 }
 
 export async function getDueCount(): Promise<number> {
-  await ready();
-  return Item.countDocuments({ "srs.dueAt": { $lte: new Date() } });
+  const { user } = await owner();
+  return Item.countDocuments({ user, "srs.dueAt": { $lte: new Date() } });
 }

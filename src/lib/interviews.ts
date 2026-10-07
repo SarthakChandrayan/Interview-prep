@@ -1,6 +1,6 @@
 import "server-only";
 import { isValidObjectId } from "mongoose";
-import { connection } from "next/server";
+import { requireUser } from "@/lib/auth/session";
 import { connectDb } from "@/lib/db";
 import type { Feedback, InterviewSubject } from "@/lib/ai/prompts";
 import type { Grade } from "@/lib/srs";
@@ -64,17 +64,17 @@ export function toPlainInterview(doc: Record<string, unknown> & { _id: unknown }
 }
 
 export async function getInterview(id: string): Promise<PlainInterview | null> {
-  await connection();
+  const user = await requireUser();
   if (!isValidObjectId(id)) return null;
   await connectDb();
-  const doc = await Interview.findById(id).lean();
+  const doc = await Interview.findOne({ _id: id, user: user.id }).lean();
   return doc ? toPlainInterview(doc) : null;
 }
 
 export async function listInterviews(limit = 20) {
-  await connection();
+  const user = await requireUser();
   await connectDb();
-  const docs = await Interview.find({}, { system: 0, "messages.content": 0 })
+  const docs = await Interview.find({ user: user.id }, { system: 0, "messages.content": 0 })
     .sort({ createdAt: -1 })
     .limit(limit)
     .lean();
@@ -82,10 +82,10 @@ export async function listInterviews(limit = 20) {
 }
 
 export async function listInterviewsForItem(itemId: string, limit = 10) {
-  await connection();
+  const user = await requireUser();
   if (!isValidObjectId(itemId)) return [];
   await connectDb();
-  const docs = await Interview.find({ item: itemId }, { system: 0, "messages.content": 0 })
+  const docs = await Interview.find({ item: itemId, user: user.id }, { system: 0, "messages.content": 0 })
     .sort({ createdAt: -1 })
     .limit(limit)
     .lean();

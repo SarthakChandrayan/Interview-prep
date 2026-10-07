@@ -16,6 +16,7 @@ const srsSchema = new Schema(
 
 const itemSchema = new Schema(
   {
+    user: { type: Schema.Types.ObjectId, ref: "User", required: true },
     title: { type: String, required: true, trim: true, maxlength: 200 },
     kind: { type: String, enum: KINDS, required: true },
     topic: { type: String, required: true, trim: true, maxlength: 60 },
@@ -28,9 +29,9 @@ const itemSchema = new Schema(
   { timestamps: true },
 );
 
-// The review queue reads "everything due before now, oldest first".
-itemSchema.index({ "srs.dueAt": 1 });
-itemSchema.index({ kind: 1, topic: 1 });
+// The review queue reads "this user's items due before now, oldest first".
+itemSchema.index({ user: 1, "srs.dueAt": 1 });
+itemSchema.index({ user: 1, kind: 1, topic: 1 });
 
 export type ItemDoc = InferSchemaType<typeof itemSchema>;
 

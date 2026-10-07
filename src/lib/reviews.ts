@@ -5,12 +5,15 @@ import { GRADES, schedule, type Grade, type SrsState } from "@/lib/srs";
 import { Item } from "@/models/Item";
 import { Review } from "@/models/Review";
 
-/** Grade an item: reschedule it and log the review. Returns false if the item is gone. */
-export async function recordReview(itemId: string, grade: Grade): Promise<boolean> {
+/**
+ * Grade one of the user's items: reschedule it and log the review.
+ * Returns false if the item doesn't exist or belongs to someone else.
+ */
+export async function recordReview(userId: string, itemId: string, grade: Grade): Promise<boolean> {
   if (!isValidObjectId(itemId) || !GRADES.includes(grade)) throw new Error("Invalid review");
 
   await connectDb();
-  const item = await Item.findById(itemId);
+  const item = await Item.findOne({ _id: itemId, user: userId });
   if (!item) return false;
 
   const now = new Date();
@@ -18,7 +21,7 @@ export async function recordReview(itemId: string, grade: Grade): Promise<boolea
   item.set("srs", next);
   await Promise.all([
     item.save(),
-    Review.create({ item: item._id, grade, intervalAfter: next.interval, reviewedAt: now }),
+    Review.create({ user: userId, item: item._id, grade, intervalAfter: next.interval, reviewedAt: now }),
   ]);
   return true;
 }

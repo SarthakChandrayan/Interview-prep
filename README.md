@@ -19,6 +19,8 @@ into your review schedule.
 | --- | --- |
 | ![Dashboard in dark mode](docs/screenshots/dashboard-dark.png) | <img src="docs/screenshots/mobile-review.png" alt="Review on mobile" width="260"> |
 
+![Sign in](docs/screenshots/login.png)
+
 ## Features
 
 **Spaced repetition**
@@ -35,6 +37,10 @@ into your review schedule.
 **Dashboard**
 - Cards due today and progress, a review streak, a year-long activity heatmap, and topics ranked by how often you forget them (MongoDB aggregation pipelines).
 
+**Accounts**
+- Email and password sign-up with private decks. Every query and action is scoped to the signed-in user.
+- Account settings: change name or password (signs out other devices), sign out, delete account and all data.
+
 **Polish**
 - Light, dark and system themes with no flash on load, a responsive layout with a mobile drawer, accessible dialogs and form errors, toasts, skeleton loading states and empty states.
 
@@ -45,6 +51,7 @@ into your review schedule.
 | Framework | Next.js 16 (App Router, Server Components, Server Actions, Partial Prerendering) |
 | Language | TypeScript (strict) |
 | Database | MongoDB + Mongoose |
+| Auth | Custom sessions: scrypt password hashing, hashed session tokens in MongoDB, httpOnly cookies |
 | AI | Claude API via `@anthropic-ai/sdk` (streaming, structured outputs, prompt caching) |
 | Validation | Zod (forms, env, API input, AI output schema) |
 | UI | Tailwind CSS v4 with semantic design tokens, Geist font, Lucide icons, Sonner toasts |
@@ -56,13 +63,17 @@ into your review schedule.
 ```
 src/
 ├── app/
-│   ├── page.tsx                       Dashboard
-│   ├── review/                        Spaced-repetition session
-│   ├── items/                         Library: list, detail, new, edit
-│   ├── interview/                     Mock interview hub, session page, server actions
+│   ├── (app)/                         Signed-in pages, with the sidebar shell
+│   │   ├── page.tsx                   Dashboard
+│   │   ├── review/                    Spaced-repetition session
+│   │   ├── items/                     Library: list, detail, new, edit
+│   │   ├── interview/                 Mock interview hub and session pages
+│   │   └── account/                   Account settings
+│   ├── (auth)/                        Login and sign-up
 │   ├── api/interviews/[id]/turn/      Streaming endpoint for interviewer replies (NDJSON)
-│   ├── api/health/                    Health check (database ping)
-│   └── actions.ts                     Item create / update / delete / review
+│   └── api/health/                    Health check (database ping)
+├── actions/                           Server Actions: items, interviews, auth
+├── proxy.ts                           Optimistic sign-in redirect + sliding cookie refresh
 ├── components/                        UI: design-system primitives, shell, interview room…
 ├── lib/
 │   ├── srs.ts                         SM-2 scheduler (pure, unit tested)
@@ -70,8 +81,10 @@ src/
 │   ├── data.ts, interviews.ts         Queries and aggregations
 │   ├── reviews.ts                     Shared "record a review" logic
 │   ├── env.ts                         Validated environment config
-│   └── ai/                            Client, prompts, feedback schema, rate limits
-└── models/                            Item, Review, Interview, UsageCounter
+│   ├── rate-limit.ts                  Fixed-window counters (logins, AI quotas)
+│   ├── auth/                          Password hashing, session tokens, sessions, validation
+│   └── ai/                            Client, prompts, feedback schema, AI quotas
+└── models/                            User, Session, Item, Review, Interview, UsageCounter
 ```
 
 ### Design decisions
@@ -81,6 +94,7 @@ src/
 - **Resilient streaming.** If the browser disconnects mid-reply, the server finishes generating and saves the reply anyway. A per-interview lock stops two tabs from streaming at once, and a reload mid-reply recovers automatically.
 - **Structured feedback.** The feedback report is requested as JSON that matches a Zod schema, so the UI never parses free text.
 - **Cost controls.** AI is optional (the app runs fully without a key). Daily caps per client and per app protect a public deployment, chat turns run at low effort, and server-side model fallback is enabled.
+- **Authentication.** Passwords are hashed with scrypt (built into Node, memory-hard). Session cookies are random 256-bit tokens; the database stores only their SHA-256, so a database leak doesn't expose working sessions. Sessions expire after 30 days of inactivity, and a MongoDB TTL index cleans them up. The proxy only checks that a cookie exists (cheap, runs on every request), and the real check happens in the data layer: every query filters on the signed-in user, so another user's document looks exactly like a missing one. Logins are rate-limited per IP and per email, and login timing doesn't reveal whether an email has an account.
 - **Rendering.** Pages prerender a static shell (navigation, headings, skeletons), and database-backed parts stream in through `<Suspense>`. Mutations are Server Actions that revalidate what they change.
 
 ## Running locally
@@ -95,7 +109,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000 and click **Load the starter pack** for 20 sample items.
+Open http://localhost:3000, create an account, and click **Load the starter pack** for 20 sample items. If you used PrepDeck before accounts existed, the first account you create takes over that data.
 
 ### Environment variables
 
@@ -105,7 +119,7 @@ Open http://localhost:3000 and click **Load the starter pack** for 20 sample ite
 | `ANTHROPIC_API_KEY` | no | (unset) | Enables the AI interviewer |
 | `ANTHROPIC_MODEL` | no | `claude-sonnet-5-5` | Model for interviews and feedback |
 | `AI_DAILY_LIMIT` | no | `300` | Max AI calls per day for the whole app |
-| `AI_PER_CLIENT_DAILY_LIMIT` | no | `60` | Max AI calls per day per client IP |
+| `AI_PER_USER_DAILY_LIMIT` | no | `60` | Max AI calls per day per user |
 
 ### Scripts
 
@@ -129,7 +143,7 @@ Vercel plus MongoDB Atlas (free tier) works well:
 
 ## Roadmap
 
-- [ ] Accounts (Auth.js), so each user has a private deck. The app is currently single-user; don't expose it publicly without adding this.
+- [ ] Sign in with Google / GitHub, plus email verification and password reset (needs an email provider)
 - [ ] Paste a job description and get a generated study plan and items
 - [ ] Import solved problems from a LeetCode profile
 - [ ] User time zones for streaks (currently UTC)

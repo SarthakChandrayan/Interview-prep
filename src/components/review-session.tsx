@@ -4,7 +4,7 @@ import { ArrowUpRight, Eye, MessagesSquare, PartyPopper, Pencil } from "lucide-r
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { reviewItem } from "@/app/actions";
+import { reviewItem } from "@/actions/items";
 import type { PlainItem } from "@/lib/data";
 import { GRADES, formatInterval, previewIntervals, type Grade } from "@/lib/srs";
 import { Markdown } from "./markdown";

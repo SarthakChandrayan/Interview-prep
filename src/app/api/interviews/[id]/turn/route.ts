@@ -4,8 +4,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { AiUnavailableError, describeAiError, fallbackParams, getClient, isAiEnabled } from "@/lib/ai/client";
 import { replayableContent, textOf } from "@/lib/ai/content";
-import { RateLimitedError, clientKeyFrom, consumeAiQuota } from "@/lib/ai/limits";
+import { RateLimitedError, consumeAiQuota } from "@/lib/ai/limits";
 import { KICKOFF_MESSAGE, MAX_ANSWERS, MAX_ANSWER_CHARS } from "@/lib/ai/prompts";
+import { getCurrentUser } from "@/lib/auth/session";
 import { connectDb } from "@/lib/db";
 import { Interview } from "@/models/Interview";
 
@@ -27,6 +28,8 @@ function fail(status: number, message: string, code?: ErrorCode) {
  *   {"type":"delta","text":"..."}  … then {"type":"done"} or {"type":"error","message":"..."}
  */
 export async function POST(req: NextRequest, ctx: RouteContext<"/api/interviews/[id]/turn">) {
+  const user = await getCurrentUser();
+  if (!user) return fail(401, "Your session has expired. Sign in again.");
   const { id } = await ctx.params;
   if (!isValidObjectId(id)) return fail(404, "Interview not found");
   if (!isAiEnabled()) return fail(503, new AiUnavailableError().message);
@@ -36,7 +39,8 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/interviews/
   const answer = parsed.data.answer;
 
   await connectDb();
-  const interview = await Interview.findById(id);
+  // Someone else's interview looks exactly like a missing one.
+  const interview = await Interview.findOne({ _id: id, user: user.id });
   if (!interview) return fail(404, "Interview not found");
   if (interview.status === "completed") return fail(409, "This interview has ended.");
 
@@ -65,7 +69,7 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/interviews/
   const unlock = () => Interview.updateOne({ _id: id }, { busyUntil: null });
 
   try {
-    await consumeAiQuota(clientKeyFrom(req.headers));
+    await consumeAiQuota(user.id);
   } catch (err) {
     await unlock();
     if (err instanceof RateLimitedError) return fail(429, err.message);

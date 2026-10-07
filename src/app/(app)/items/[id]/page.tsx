@@ -2,7 +2,7 @@ import { ArrowLeft, ArrowUpRight, MessagesSquare, Pencil, RotateCcw, Trash2 } fr
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { deleteItem, resetItemProgress } from "@/app/actions";
+import { deleteItem, resetItemProgress } from "@/actions/items";
 import { ConfirmButton } from "@/components/confirm-button";
 import { Markdown } from "@/components/markdown";
 import { ScoreBadge } from "@/components/score";

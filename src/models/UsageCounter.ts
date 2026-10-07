@@ -1,6 +1,7 @@
 import { Schema, model, models, type Model } from "mongoose";
 
-// Daily request counters for AI rate limiting. Documents expire after two days.
+// Fixed-window counters for rate limiting (AI quotas, login attempts).
+// `day` holds the window number. Documents expire after two days.
 const usageCounterSchema = new Schema({
   key: { type: String, required: true },
   day: { type: String, required: true },

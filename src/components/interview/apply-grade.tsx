@@ -3,7 +3,7 @@
 import { Check, Loader2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { applyInterviewGrade } from "@/app/interview/actions";
+import { applyInterviewGrade } from "@/actions/interview";
 import { GRADES, type Grade } from "@/lib/srs";
 import { cn } from "../ui";
 

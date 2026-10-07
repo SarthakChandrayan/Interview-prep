@@ -1,7 +1,7 @@
 import { ArrowRight, BookMarked, Flame, Layers, MessagesSquare, Sparkles, Target, Upload } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
-import { importStarterPack } from "@/app/actions";
+import { importStarterPack } from "@/actions/items";
 import { ActivityHeatmap } from "@/components/activity-heatmap";
 import { SubmitButton } from "@/components/submit-button";
 import { ButtonLink, Card, CardHeader, EmptyState, PageHeader, Skeleton, cn } from "@/components/ui";
